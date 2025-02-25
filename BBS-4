@@ -1,0 +1,124 @@
+import zlib
+import lz4.frame
+import bz2
+import gzip
+import lzma
+import brotli
+import zstandard as zstd
+import math
+import liblzfse
+import lzham
+import zpaq
+import pydensity
+import paq
+import numpy as np
+import sys
+import sympy
+
+class BlumBlumShub:
+    def __init__(self, seed=0xDEADBEEF):
+        p = sympy.randprime(2**31, 2**32)
+        q = sympy.randprime(2**31, 2**32)
+        n = p * q
+        s = seed
+        while sympy.gcd(s, n) != 1:
+            s += 1
+        self.state = s
+        self.n = n
+
+    def generate(self, size):
+        result = bytearray(size)
+        for i in range(size):
+            self.state = pow(self.state, 2, self.n)
+            result[i] = self.state & 0xFF
+        return bytes(result)
+
+def compress_with_zlib(data):
+    return zlib.compress(data, zlib.DEFLATED)
+
+def compress_with_lz4(data):
+    return lz4.frame.compress(data)
+
+def compress_with_bz2(data):
+    return bz2.compress(data)
+
+def compress_with_gzip(data):
+    return gzip.compress(data)
+
+def compress_with_lzma(data):
+    return lzma.compress(data)
+
+def compress_with_brotli(data):
+    return brotli.compress(data)
+
+def compress_with_zstd(data):
+    cctx = zstd.ZstdCompressor(level=3)
+    return cctx.compress(data)
+
+def compress_with_lempel_ziv(data):
+    return zlib.compress(data, zlib.Z_DEFAULT_COMPRESSION)
+
+def compress_with_lzfse(data):
+    return liblzfse.compress(data)
+
+def compress_with_zpaq(data):
+    return zpaq.compress(data)
+
+def compress_with_lzham(data):
+    return lzham.compress(data)
+
+def compress_with_pydensity(data):
+    algorithm = pydensity.Algorithm.lion  # Choose a valid compression algorithm here
+    return pydensity.compress(data, algorithm)
+
+def compress_with_paq(data):
+    return paq.compress(data)
+
+def test_randomness():
+    compressors = {
+        'lz4': compress_with_lz4,
+        'brotli': compress_with_brotli,
+        'zstd': compress_with_zstd,
+        'lzfse': compress_with_lzfse,
+    }
+
+    file_sizes = [10**3, 10**4, 10**5, 10**6]
+    num_iterations = 100
+
+    # Print the header
+    print("{:<15}".format("Compressor"), end="")
+    for file_size in file_sizes:
+        print("| {:<15}".format(str(file_size)), end="")
+    print()
+    print("=" * (15 + 16 * len(file_sizes)))
+
+    bbs = BlumBlumShub(seed=0xDEADBEEF)  # Seed changed to a more suitable value
+
+    for comp_name, compressor in compressors.items():
+        print("{:<15}".format(comp_name), end="")
+        for file_size in file_sizes:
+            failed_count = 0
+            critical_value = file_size * math.log2(256)/8 - 1
+
+            for _ in range(num_iterations):
+                random_data = bbs.generate(file_size)
+                compressed_data = compressor(random_data)
+
+                if compressed_data is None:
+                    # Failed to compress data
+                    continue
+
+                compressed_length = len(compressed_data)
+
+                if compressed_length <= critical_value:
+                    failed_count += 1
+
+            print("| {:<15}".format(failed_count), end="")
+
+        print()
+
+def main():
+    test_randomness()
+
+if __name__ == "__main__":
+    main()
